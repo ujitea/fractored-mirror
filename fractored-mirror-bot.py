@@ -19,16 +19,41 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.guilds = True
 intents.messages = True
+intents.reactions = True
 
-bot = commands.Bot(command_prefix="!", intents=intents)   # Only use this!
+bot = commands.Bot(command_prefix="!", intents=intents)  
+
+owner_message_id = {}
+
+@bot.event
+async def on_reaction_add(reaction, user):
+    # ignore bot reactions
+    if user.bot:
+        return
+
+    # only act on trashcan emoji
+    if str(reaction.emoji) != "🗑️":
+        return
+
+    msg = reaction.message
+    # only allow the recorded owner to delete
+    owner_id = owner_message_id.get(msg.id)
+
+    if owner_id is None:
+        return  
+
+    if user.id == owner_id:
+        try:
+            await msg.delete()
+            owner_message_id.pop(msg.id, None)
+        except discord.Forbidden:
+            pass
 
 @bot.event
 async def on_message(message):
     if message.author.bot:
         return
     
-    # view = View()
-
     # Watermark logic: If there's an image attachment in the TARGET_CHANNEL
     if message.channel.id == SUCCESS_ID and message.attachments:
         for attachment in message.attachments:
@@ -37,9 +62,14 @@ async def on_message(message):
                 watermarked = success_overlay.add_image_watermark(img_data, 'watermark.png')
                 await message.delete()
                 file = discord.File(watermarked, filename="watermarked.jpg")
-                await message.channel.send(
-                    f"{message.author.mention} Here is your watermarked image!", file=file
+                sent_message = await message.channel.send(
+                    f"{message.author.mention}",
+                    file=file
                 )
+                await sent_message.add_reaction("🗑️")
+                owner_message_id[sent_message.id] = message.author.id
+
+
         # Return early if image watermarking logic ran (optional, if you don't want other logic to execute)
         return
 
