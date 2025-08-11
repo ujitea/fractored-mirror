@@ -1,31 +1,50 @@
 from PIL import Image
-import io
+import io, random
 
-def add_image_watermark(image_bytes, watermark_path='watermark.png'):
-    with Image.open(io.BytesIO(image_bytes)).convert("RGBA") as base:
-        with Image.open(watermark_path).convert("RGBA") as watermark:
-            scale_factor = 0.25
-            w_width = int(base.width * scale_factor)
-            w_height = int(watermark.height * (w_width / watermark.width))
-            watermark = watermark.resize((w_width, w_height), Image.LANCZOS)
-            # position = (base.width - w_width - 10, base.height - w_height - 10)
-           
-            desired_alpha = 1000  # lower = more transparent, higher = less
-            if watermark.mode != 'RGBA':
-                watermark = watermark.convert('RGBA')
-            alpha = watermark.split()[3]
-            alpha = alpha.point(lambda p: desired_alpha)
-            watermark.putalpha(alpha)
+# Pillow resampling fallback (older/newer versions)
+try:
+    RESAMPLE = Image.Resampling.LANCZOS
+except AttributeError:
+    RESAMPLE = Image.LANCZOS
 
+def add_image_watermark(image_bytes, watermark_path='watermark.png',
+                        scale_factor=0.25, opacity=0.67, # AHAHAH 6 777
+                        margin_x=20, margin_y=20):
+    """
+    Places watermark copies in a grid pattern across the image.
+    Returns a BytesIO object ready for discord.File(...)
+    """
+    # 1) Load base & watermark
+    base = Image.open(io.BytesIO(image_bytes)).convert("RGBA")
+    W, H = base.size
+    watermark = Image.open(watermark_path).convert("RGBA")
 
-            transparent = Image.new("RGBA", base.size)            
-            
-            for y in range(0, base.height, w_height + 20):  # 20px padding, adjust as needed
-                for x in range(0, base.width, w_width + 20):
-                    transparent.paste(watermark, (x,y), mask=watermark)
-            
-            
-            out = io.BytesIO()
-            transparent.convert("RGB").save(out, format="JPEG")
-            out.seek(0)
-            return out
+    # 2) Resize watermark based on scale_factor
+    w_w = int(base.width * scale_factor)
+    w_h = int(watermark.height * (w_w / watermark.width))
+    watermark = watermark.resize((w_w, w_h), RESAMPLE)
+
+    # 3) Apply opacity
+    r, g, b, a = watermark.split()
+    a = a.point(lambda px: int(px * opacity))
+    watermark.putalpha(a)
+
+    # 4) Overlay for all marks
+    overlay = Image.new("RGBA", base.size, (0, 0, 0, 0))
+
+    # 5) Grid placement
+    for y in range(0, H, w_h + margin_y):
+        for x in range(0, W, w_w + margin_x):
+            overlay.alpha_composite(watermark, dest=(x, y))
+
+    # 6) Merge and save
+    out_img = Image.alpha_composite(base, overlay)
+
+    buf = io.BytesIO()
+    fmt = (Image.open(io.BytesIO(image_bytes)).format or "PNG").upper()
+    if fmt == "JPEG":
+        out_img.convert("RGB").save(buf, format="JPEG", quality=95, optimize=True)
+    else:
+        out_img.save(buf, format="PNG", optimize=True)
+    buf.seek(0)
+    return buf
