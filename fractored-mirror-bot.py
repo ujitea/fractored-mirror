@@ -36,7 +36,13 @@ async def on_reaction_add(reaction, user):
         return
 
     msg = reaction.message
-    # only allow the recorded owner to delete
+
+    if msg.guild:
+        try:
+            msg = await msg.channel.fetch_message(msg.id)
+        except discord.NotFound:
+            return
+        
     owner_id = owner_message_id.get(msg.id)
 
     if owner_id is None:
