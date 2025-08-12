@@ -82,8 +82,38 @@ async def on_message(message):
     # Only relay messages from the specific source channel
     if message.channel.id == SOURCE_CHANNEL_ID:
         unparsed_content = f"{message.content}"
+
+        res = embed_generator.parse_extracted_text(unparsed_content)
+
         parsed_data = embed_generator.parse_extracted_text(unparsed_content)
-        embed = embed_generator.embed_from_parsed(parsed_data)
+
+        thumb_from_embed = embed_generator.first_embed_image_url(message)
+        if thumb_from_embed and not parsed_data.get("thumbnail_url"):
+            parsed_data["thumbnail_url"] = thumb_from_embed
+            print("DING DONG")
+        # Try to pull out both a dict (parsed data) and a real Embed object from whatever was returned.
+        embed, link_view = embed_generator.embed_from_parsed(parsed_data)
+
+        if isinstance(res, tuple):
+            parsed_data = next((x for x in res if isinstance(x, dict)), None)
+            embed = next((x for x in res if hasattr(x, "to_dict")), None)  # discord.Embed has to_dict()
+        elif isinstance(res, dict):
+            parsed_data = res
+        elif hasattr(res, "to_dict"):
+            embed = res
+
+        # If we still don't have an Embed, build one from parsed_data
+        if embed is None:
+            embed = embed_generator.embed_from_parsed(parsed_data)
+
+        # If the embed builder ALSO returned a tuple (oops), extract the real Embed
+        if isinstance(embed, tuple):
+            embed = next((x for x in embed if hasattr(x, "to_dict")), None)
+
+        if not hasattr(embed, "to_dict"):
+            print("DEBUG: embed is not a discord.Embed. Type:", type(embed))
+            return
+
 
         view = View()
 
