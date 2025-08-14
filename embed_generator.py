@@ -1,9 +1,9 @@
 import os
 import re
 import html
-from urllib.parse import unquote
-
+import asyncio
 import discord
+from urllib.parse import unquote
 from discord.ext import commands
 
 DISCORD_FIELD_LIMIT = 1024
@@ -32,6 +32,14 @@ BOLD_LINE_RE = re.compile(r"^\*\*(.+?)\*\*$")
 MD_LINK_RE = re.compile(r"\[([^\]]+)\]\((https?://[^\s)]+)\)")
 MD_IMAGE_RE = re.compile(r"!\[[^\]]*\]\((https?://[^\s)]+)\)")
 IMG_EXTS = (".png", ".jpg", ".jpeg", ".gif", ".webp")
+
+
+async def wait_a_bit_for_embeds(message, delay):
+    await asyncio.sleep(delay)  # don't use time.sleep
+    try:
+        return await message.channel.fetch_message(message.id)
+    except Exception:
+        return message
 
 
 def first_embed_image_url(msg: discord.Message) -> str | None:

@@ -8,7 +8,7 @@ except AttributeError:
     RESAMPLE = Image.LANCZOS
 
 def add_image_watermark(image_bytes, watermark_path='watermark.png',
-                        scale_factor=0.25, opacity=0.67, # AHAHAH 6 777
+                        scale_factor=0.25, opacity=0.25, # AHAHAH 6 777
                         margin_x=20, margin_y=20):
     """
     Places watermark copies in a grid pattern across the image.

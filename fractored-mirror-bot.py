@@ -2,18 +2,37 @@ import discord
 import embed_generator
 import success_overlay
 import os
+import asyncio
 from discord.ext import commands
 from discord.ui import Button, View
+from uuid import uuid4
 from dotenv import load_dotenv
+# from deal_bot import client, TOKEN
 
 load_dotenv()
 
 BOT_TOKEN = os.getenv("DISCORD_TOKEN")
+####################################################
+# MAIN SERVER
 TARGET_CHANNEL_ID = int(os.getenv("TARGET"))
-SOURCE_CHANNEL_ID = int(os.getenv("SOURCE"))
-ANNOUNCEMENTS_ID = int(os.getenv("ANNOUNCEMENTS"))
+# SOURCE_CHANNEL_ID = int(os.getenv("SOURCE")) 
+MAJOR_ID = int(os.getenv("MAJOR"))
 MINOR_ID = int(os.getenv("MINOR"))
+MEMBER_ID = int(os.getenv("MEMBER"))
+PERSONAL_ID = int(os.getenv("PERSONAL"))
+FOOD_ID = int(os.getenv("FOOD"))
 SUCCESS_ID = int(os.getenv("SUCCESS"))
+###################################################
+# FORWARDING SERVER
+MAJOR_FID = int(os.getenv("F_MAJOR"))
+MINOR_FID = int(os.getenv("F_MINOR"))
+MEMBER_FID = int(os.getenv("F_MEMBER"))
+DEALS_FID = int(os.getenv("F_DEALS"))
+FOOD_FID = int(os.getenv("F_FOOD"))
+CHIPOTLE_FID = int(os.getenv("F_CHIPOTLE"))
+
+SOURCE_CHANNEL_IDS = {MAJOR_FID,MINOR_FID,MEMBER_FID,DEALS_FID,FOOD_FID,CHIPOTLE_FID}
+
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -24,6 +43,8 @@ intents.reactions = True
 bot = commands.Bot(command_prefix="!", intents=intents)  
 
 owner_message_id = {}
+
+# Event that deletes images based on owner's message
 
 @bot.event
 async def on_reaction_add(reaction, user):
@@ -55,11 +76,13 @@ async def on_reaction_add(reaction, user):
         except discord.Forbidden:
             pass
 
+
 @bot.event
 async def on_message(message):
     if message.author.bot:
         return
     
+    # Add watermark overlay w/ server logo
     # Watermark logic: If there's an image attachment in the TARGET_CHANNEL
     if message.channel.id == SUCCESS_ID and message.attachments:
         for attachment in message.attachments:
@@ -79,15 +102,25 @@ async def on_message(message):
         # Return early if image watermarking logic ran (optional, if you don't want other logic to execute)
         return
 
-    # Only relay messages from the specific source channel
-    if message.channel.id == SOURCE_CHANNEL_ID:
-        unparsed_content = f"{message.content}"
+    # Only source channel list
+    if message.channel.id in SOURCE_CHANNEL_IDS:
+        target_channel = message.channel
+
+        view = View()
+
+        # unparsed_content = f"{message.content}"   
+
+        msg = await embed_generator.wait_a_bit_for_embeds(message, delay=0.5)  # try 0.8–1.5s
+        unparsed_content = msg.content
+        thumb_from_embed = embed_generator.first_embed_image_url(msg)
+
 
         res = embed_generator.parse_extracted_text(unparsed_content)
 
         parsed_data = embed_generator.parse_extracted_text(unparsed_content)
 
         thumb_from_embed = embed_generator.first_embed_image_url(message)
+
         if thumb_from_embed and not parsed_data.get("thumbnail_url"):
             parsed_data["thumbnail_url"] = thumb_from_embed
             print("DING DONG")
@@ -115,42 +148,82 @@ async def on_message(message):
             return
 
 
-        view = View()
+        # view = View()
 
-        button1 = Button(label="channel-1", style=discord.ButtonStyle.green)
-        button2 = Button(label="channel-2", style=discord.ButtonStyle.green)
+        button_major = Button(label="major",  style=discord.ButtonStyle.success, custom_id=f"major:{message.id}:{uuid4().hex}")
+        button_minor = Button(label="minor",  style=discord.ButtonStyle.success, custom_id=f"minor:{message.id}:{uuid4().hex}")
+        button_member   = Button(label="member",   style=discord.ButtonStyle.success, custom_id=f"member:{message.id}:{uuid4().hex}")
+        button_personal = Button(label="personal", style=discord.ButtonStyle.success, custom_id=f"personal:{message.id}:{uuid4().hex}")
+        button_food     = Button(label="food",     style=discord.ButtonStyle.success, custom_id=f"food:{message.id}:{uuid4().hex}")
 
-        async def disable_all_buttons(interaction):
+
+
+        async def disable_all_buttons(interaction: discord.Interaction):
             for item in view.children:
                 item.disabled = True
             await interaction.message.edit(view=view)
 
-        async def button1_callback(interaction):
-            target_channel = bot.get_channel(ANNOUNCEMENTS_ID)
-            if target_channel:
-                await target_channel.send(embed=embed)
-                await disable_all_buttons(interaction)
-                await interaction.response.send_message("Success!", ephemeral=True)
-            else:
-                await interaction.response.send_message("channel 1 not found.", ephemeral=True)
-        button1.callback = button1_callback
-        view.add_item(button1)
+        # --- Major ---
+        async def button_major_callback(interaction: discord.Interaction):
+            dest = bot.get_channel(MAJOR_ID) or await bot.fetch_channel(MAJOR_ID)
+            if not dest:
+                return await interaction.response.send_message("Major channel not found.", ephemeral=True)
+            await dest.send(content="@everyone", embed=embed)
+            await disable_all_buttons(interaction)
+            await interaction.response.send_message("Sent to Major.", ephemeral=True)
+        button_major.callback = button_major_callback
 
-        async def button2_callback(interaction):
-            target_channel = bot.get_channel(MINOR_ID)
-            if target_channel:
-                await target_channel.send(embed=embed)
-                await disable_all_buttons(interaction)
-                await interaction.response.send_message("Success!", ephemeral=True)
-            else:
-                await interaction.response.send_message("channel 2 not found.", ephemeral=True)
-        button2.callback = button2_callback
-        view.add_item(button2)
+        # --- Minor ---
+        async def button_minor_callback(interaction: discord.Interaction):
+            dest = bot.get_channel(MINOR_ID) or await bot.fetch_channel(MINOR_ID)
+            if not dest:
+                return await interaction.response.send_message("Minor channel not found.", ephemeral=True)
+            await dest.send(content="@everyone", embed=embed)
+            await disable_all_buttons(interaction)
+            await interaction.response.send_message("Sent to Minor.", ephemeral=True)
+        button_minor.callback = button_minor_callback
 
-        target_channel = bot.get_channel(TARGET_CHANNEL_ID)
+        # --- Member ---
+        async def button_member_callback(interaction: discord.Interaction):
+            dest = bot.get_channel(MEMBER_ID) or await bot.fetch_channel(MEMBER_ID)
+            if not dest:
+                return await interaction.response.send_message("Member channel not found.", ephemeral=True)
+            await dest.send(content="@everyone", embed=embed)
+            await disable_all_buttons(interaction)
+            await interaction.response.send_message("Sent to Member.", ephemeral=True)
+        button_member.callback = button_member_callback
+
+        # --- Personal ---
+        async def button_personal_callback(interaction: discord.Interaction):
+            dest = bot.get_channel(PERSONAL_ID) or await bot.fetch_channel(PERSONAL_ID)
+            if not dest:
+                return await interaction.response.send_message("Personal channel not found.", ephemeral=True)
+            await dest.send(content="@everyone", embed=embed)
+            await disable_all_buttons(interaction)
+            await interaction.response.send_message("Sent to Personal.", ephemeral=True)
+        button_personal.callback = button_personal_callback
+
+        # --- Food ---
+        async def button_food_callback(interaction: discord.Interaction):
+            dest = bot.get_channel(FOOD_ID) or await bot.fetch_channel(FOOD_ID)
+            if not dest:
+                return await interaction.response.send_message("Food channel not found.", ephemeral=True)
+            await dest.send(content="@everyone", embed=embed)
+            await disable_all_buttons(interaction)
+            await interaction.response.send_message("Sent to Food.", ephemeral=True)
+        button_food.callback = button_food_callback
+
+        # Add all buttons
+        view.add_item(button_major)
+        view.add_item(button_minor)
+        view.add_item(button_member)
+        view.add_item(button_personal)
+        view.add_item(button_food)
+
+
         if target_channel:
             await target_channel.send(
-                content="at everyone",
+                content="@everyone",
                 embed=embed,
                 view=view)
 
