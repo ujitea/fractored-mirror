@@ -45,13 +45,14 @@
 
 ### Why fractored-mirror?
 
-This project strengthens your system’s robustness by integrating core trading/ops decision processes with sophisticated Discord content workflows. The core features include:
+`fractored-mirror` is a **mirroring service**: it listens to designated source channels, **parses text**, and **forwards a clean, normalized embed** to a centralized **main server/channel**—reliably and with guardrails.
 
-- ✨ **Automation & Decision-Making** — Facilitates core trading operations, executes deal strategies, and manages routing workflows efficiently.
-- 🧹 **Content Moderation & Watermarking** — Processes messages, applies watermarks, and manages message lifecycle for organized content sharing.
-- 🧩 **Embed Generation** — Converts deal data into visually appealing embeds with interactive buttons for quick user access.
-- 🎨 **Visual Branding** — Applies customizable watermarks to images, ensuring consistent branding and content protection.
-- 🧱 **Modular Integration** — Coordinates multiple modules for a cohesive, scalable system architecture.
+- 🔁 **Mirroring pipeline**: multi-channel intake → parse → normalize (price/links/images) → forward to main.
+- 🧠 **Smart parsing**: extracts title/link/price/ATC/image, waits briefly for Discord previews, and builds consistent embeds.
+- 🎛️ **Deterministic routing**: one-click buttons (major/minor/member/personal/food) send to the correct destination.
+- ⏱️ **Throttling & retries**: per-destination rate limiting with exponential backoff to survive transient HTTP/429s.
+- 🖼️ **Optional watermarking**: images can be branded before they’re mirrored to the main channel.
+- 🔐 **Configurable**: all IDs and tokens via `.env`; easy to run in different servers/environments.
 
 ---
 
